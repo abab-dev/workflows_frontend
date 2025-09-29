@@ -257,10 +257,10 @@ export default function Workflows() {
                     </div>
                   </CardTitle>
                   <CardDescription className="flex items-center space-x-4 text-xs">
-                    <div className="flex items-center space-x-1">
+                    <span className="flex items-center space-x-1">
                       <Calendar className="h-3 w-3" />
                       <span>Created {formatDate(workflow.created_at)}</span>
-                    </div>
+                    </span>
                   </CardDescription>
 
                 </CardHeader>
