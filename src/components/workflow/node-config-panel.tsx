@@ -39,6 +39,7 @@ export function NodeConfigPanel({ node, workflow, onUpdateNode, onClose, onDelet
     setIsLoadingCredentials(true);
     try {
       const response = await credentialsApi.list();
+      console.log(response.data)
 
       setCredentials(response.data);
     } catch (error: any) {
@@ -65,9 +66,9 @@ export function NodeConfigPanel({ node, workflow, onUpdateNode, onClose, onDelet
   const getRelevantCredentials = () => {
     const nodeType = node.data.nodeType;
     if (nodeType === 'telegram') {
-      return credentials.filter(c => c.type === 'telegram_bot');
+      return credentials.filter(c => c.type === 'telegram');
     } else if (nodeType === 'llm' || nodeType === 'langgraph') {
-      return credentials.filter(c => ['openai', 'google_ai'].includes(c.type));
+      return credentials.filter(c => ['openai', 'google_ai', 'gemini'].includes(c.type));
     }
     return credentials;
   };

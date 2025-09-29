@@ -52,7 +52,7 @@ export interface LoginResponse {
 }
 
 export interface Credential {
-  id: string;
+  id: number;
   name: string;
   type: string;
   created_at: string;
@@ -69,6 +69,7 @@ export interface Workflow {
   id: string;
   name: string;
   content: any;
+  webhook_token: string;
   created_at: string;
   updated_at: string;
 }
@@ -78,10 +79,12 @@ export interface WorkflowCreate {
 }
 
 export interface WorkflowRun {
-  id: string;
-  workflow_id: string;
-  status: 'running' | 'completed' | 'failed';
+  id: number;
+  workflow_id: number;
   started_at: string;
+  status: 'PENDING' | 'SUCCESS' | 'FAILED';
+  logs?: string;
+
   finished_at?: string;
 }
 

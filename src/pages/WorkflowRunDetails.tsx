@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +12,7 @@ export default function WorkflowRunDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const [runDetails, setRunDetails] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -24,7 +24,7 @@ export default function WorkflowRunDetails() {
 
   const loadRunDetails = async () => {
     if (!id) return;
-    
+
     try {
       const response = await workflowRunsApi.get(id);
       setRunDetails(response.data);
@@ -39,13 +39,30 @@ export default function WorkflowRunDetails() {
     }
   };
 
+  // FIX: Safely parse the logs string from the API response
+  const parsedLogs = useMemo(() => {
+    if (!runDetails?.logs || typeof runDetails.logs !== 'string') {
+      return null;
+    }
+    try {
+      // Attempt to parse the string as JSON
+      const parsed = JSON.parse(runDetails.logs);
+      // Pretty-print the JSON object for display
+      return JSON.stringify(parsed, null, 2);
+    } catch (error) {
+      // If it's not valid JSON, it might be a plain error string. Display as is.
+      return runDetails.logs;
+    }
+  }, [runDetails]);
+
+
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'running':
+      case 'PENDING':
         return 'bg-warning/10 text-warning border-warning/20';
-      case 'completed':
+      case 'SUCCESS':
         return 'bg-success/10 text-success border-success/20';
-      case 'failed':
+      case 'FAILED':
         return 'bg-destructive/10 text-destructive border-destructive/20';
       default:
         return 'bg-muted text-muted-foreground';
@@ -54,11 +71,11 @@ export default function WorkflowRunDetails() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'running':
+      case 'PENDING':
         return <Loader2 className="h-4 w-4 animate-spin" />;
-      case 'completed':
+      case 'SUCCESS':
         return <CheckCircle className="h-4 w-4" />;
-      case 'failed':
+      case 'FAILED':
         return <XCircle className="h-4 w-4" />;
       default:
         return <Clock className="h-4 w-4" />;
@@ -66,7 +83,8 @@ export default function WorkflowRunDetails() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -77,10 +95,11 @@ export default function WorkflowRunDetails() {
   };
 
   const calculateDuration = (startDate: string, endDate?: string) => {
+    if (!startDate) return 'N/A';
     const start = new Date(startDate);
     const end = endDate ? new Date(endDate) : new Date();
     const duration = Math.round((end.getTime() - start.getTime()) / 1000);
-    
+
     if (duration < 60) {
       return `${duration}s`;
     } else if (duration < 3600) {
@@ -125,7 +144,7 @@ export default function WorkflowRunDetails() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
+
       <main className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center space-x-4">
@@ -157,7 +176,7 @@ export default function WorkflowRunDetails() {
                 <Badge className={getStatusColor(runDetails.status)}>
                   <div className="flex items-center space-x-1">
                     {getStatusIcon(runDetails.status)}
-                    <span className="capitalize">{runDetails.status}</span>
+                    <span className="capitalize">{runDetails.status.toLowerCase()}</span>
                   </div>
                 </Badge>
               </CardTitle>
@@ -168,12 +187,10 @@ export default function WorkflowRunDetails() {
                   <h4 className="text-sm font-medium text-muted-foreground">Started At</h4>
                   <p className="text-sm">{formatDate(runDetails.started_at)}</p>
                 </div>
-                {runDetails.finished_at && (
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground">Finished At</h4>
-                    <p className="text-sm">{formatDate(runDetails.finished_at)}</p>
-                  </div>
-                )}
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground">Finished At</h4>
+                  <p className="text-sm">{formatDate(runDetails.finished_at)}</p>
+                </div>
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground">Duration</h4>
                   <p className="text-sm">
@@ -191,25 +208,14 @@ export default function WorkflowRunDetails() {
           {/* Execution Logs */}
           <Card className="shadow-card border-border/50">
             <CardHeader>
-              <CardTitle>Execution Logs</CardTitle>
+              <CardTitle>Execution Context & Output</CardTitle>
             </CardHeader>
             <CardContent>
-              {runDetails.logs && runDetails.logs.length > 0 ? (
-                <div className="bg-muted rounded-lg p-4 font-mono text-sm space-y-2">
-                  {runDetails.logs.map((log: any, index: number) => (
-                    <div key={index} className="flex items-start space-x-2">
-                      <span className="text-muted-foreground shrink-0">
-                        {new Date(log.timestamp).toLocaleTimeString()}
-                      </span>
-                      <span className={`${
-                        log.level === 'error' ? 'text-destructive' :
-                        log.level === 'warning' ? 'text-warning' :
-                        'text-foreground'
-                      }`}>
-                        {log.message}
-                      </span>
-                    </div>
-                  ))}
+              {parsedLogs ? (
+                <div className="bg-muted rounded-lg p-4 font-mono text-sm">
+                  <pre className="whitespace-pre-wrap break-all">
+                    {parsedLogs}
+                  </pre>
                 </div>
               ) : (
                 <div className="text-center py-8">
@@ -224,7 +230,7 @@ export default function WorkflowRunDetails() {
           </Card>
 
           {/* Error Details (if failed) */}
-          {runDetails.status === 'failed' && runDetails.error && (
+          {runDetails.status === 'FAILED' && parsedLogs && (
             <Card className="shadow-card border-destructive/20 bg-destructive/5">
               <CardHeader>
                 <CardTitle className="text-destructive">Error Details</CardTitle>
@@ -232,7 +238,7 @@ export default function WorkflowRunDetails() {
               <CardContent>
                 <div className="bg-destructive/10 rounded-lg p-4 font-mono text-sm">
                   <pre className="whitespace-pre-wrap text-destructive">
-                    {JSON.stringify(runDetails.error, null, 2)}
+                    {parsedLogs}
                   </pre>
                 </div>
               </CardContent>

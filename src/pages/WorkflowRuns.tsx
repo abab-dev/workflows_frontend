@@ -13,7 +13,7 @@ export default function WorkflowRuns() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const [runs, setRuns] = useState<WorkflowRun[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -25,7 +25,7 @@ export default function WorkflowRuns() {
 
   const loadRuns = async () => {
     if (!id) return;
-    
+
     try {
       const response = await workflowsApi.getRuns(id);
       setRuns(response.data);
@@ -81,7 +81,7 @@ export default function WorkflowRuns() {
     const start = new Date(startDate);
     const end = endDate ? new Date(endDate) : new Date();
     const duration = Math.round((end.getTime() - start.getTime()) / 1000);
-    
+
     if (duration < 60) {
       return `${duration}s`;
     } else if (duration < 3600) {
@@ -94,7 +94,7 @@ export default function WorkflowRuns() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
+
       <main className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center space-x-4">
@@ -157,7 +157,7 @@ export default function WorkflowRuns() {
                   {runs.map((run) => (
                     <TableRow key={run.id}>
                       <TableCell className="font-mono text-sm">
-                        {run.id.slice(0, 8)}...
+                        {String(run.id)}
                       </TableCell>
                       <TableCell>
                         <Badge className={getStatusIcon(run.status) && getStatusColor(run.status)}>
