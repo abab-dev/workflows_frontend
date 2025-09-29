@@ -16,7 +16,7 @@ export default function Workflows() {
   const [isCreating, setIsCreating] = useState(false);
   const [newWorkflowName, setNewWorkflowName] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  
+
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -47,12 +47,12 @@ export default function Workflows() {
       const response = await workflowsApi.create({
         name: newWorkflowName.trim(),
       });
-      
+
       toast({
         title: 'Workflow created!',
         description: `"${response.data.name}" has been created.`,
       });
-      
+
       setNewWorkflowName('');
       setIsDialogOpen(false);
       navigate(`/workflows/${response.data.id}`);
@@ -99,7 +99,7 @@ export default function Workflows() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
+
       <main className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -108,7 +108,7 @@ export default function Workflows() {
               Create and manage your automation workflows
             </p>
           </div>
-          
+
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="gradient-primary hover:opacity-90 transition-smooth">
@@ -139,7 +139,7 @@ export default function Workflows() {
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button 
+                <Button
                   onClick={handleCreateWorkflow}
                   disabled={!newWorkflowName.trim() || isCreating}
                   className="gradient-primary hover:opacity-90"
@@ -201,7 +201,7 @@ export default function Workflows() {
                   <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button 
+                  <Button
                     onClick={handleCreateWorkflow}
                     disabled={!newWorkflowName.trim() || isCreating}
                     className="gradient-primary hover:opacity-90"
@@ -222,8 +222,8 @@ export default function Workflows() {
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {workflows.map((workflow) => (
-              <Card 
-                key={workflow.id} 
+              <Card
+                key={workflow.id}
                 className="shadow-card hover:shadow-elegant transition-smooth border-border/50"
               >
                 <CardHeader>
@@ -262,6 +262,7 @@ export default function Workflows() {
                       <span>Created {formatDate(workflow.created_at)}</span>
                     </div>
                   </CardDescription>
+
                 </CardHeader>
                 <CardContent>
                   <div className="flex space-x-2">

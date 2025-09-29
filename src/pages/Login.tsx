@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -97,9 +98,9 @@ export default function Login() {
                   className="transition-smooth"
                 />
               </div>
-              <Button 
-                type="submit" 
-                className="w-full gradient-primary hover:opacity-90 transition-smooth" 
+              <Button
+                type="submit"
+                className="w-full gradient-primary hover:opacity-90 transition-smooth"
                 disabled={isLoading}
               >
                 {isLoading ? (

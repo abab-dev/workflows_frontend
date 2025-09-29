@@ -29,7 +29,7 @@ export default function WorkflowEditor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -44,30 +44,6 @@ export default function WorkflowEditor() {
     }
   }, [id]);
 
-  const loadWorkflow = async () => {
-    if (!id) return;
-    
-    try {
-      const response = await workflowsApi.get(id);
-      const workflowData = response.data;
-      setWorkflow(workflowData);
-      
-      // Load existing workflow content if available
-      if (workflowData.content) {
-        setNodes(workflowData.content.nodes || []);
-        setEdges(workflowData.content.edges || []);
-      }
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error loading workflow',
-        description: error.response?.data?.detail || 'Failed to load workflow.',
-      });
-      navigate('/workflows');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -82,42 +58,139 @@ export default function WorkflowEditor() {
     setSelectedNode(null);
   }, []);
 
+  const handleDeleteNode = (nodeId: string) => {
+    // Remove the node itself
+    setNodes((nds) => nds.filter((node) => node.id !== nodeId));
+    // Remove any edges connected to the node
+    setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
+    // Close the config panel
+    setSelectedNode(null);
+  };
+
+
+  const loadWorkflow = async () => {
+    if (!id) return;
+
+    try {
+      const response = await workflowsApi.get(id);
+      const workflowData = response.data;
+      setWorkflow(workflowData);
+
+      if (workflowData.json_content) {
+        const nodesForCanvas = (workflowData.json_content.nodes || []).map(node => {
+          // --- START: ROBUSTNESS FIX ---
+          // This ensures that older, saved workflows without the 'type' in inputs are fixed on load.
+          const inputs = node.data.inputs || {};
+          if (!inputs.type) {
+            inputs.type = node.type;
+          }
+          // --- END: ROBUSTNESS FIX ---
+
+          return {
+            ...node,
+            type: 'default',
+            data: {
+              ...node.data,
+              inputs: inputs, // Use the potentially fixed inputs object
+              nodeType: node.type,
+            },
+          };
+        });
+        setNodes(nodesForCanvas);
+        setEdges(workflowData.json_content.edges || []);
+      }
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error loading workflow',
+        description: error.response?.data?.detail || 'Failed to load workflow.',
+      });
+      navigate('/workflows');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!id) return;
-    
+
+    const startNode = nodes.find(n =>
+      n.data.nodeType === 'manual_trigger' || n.data.nodeType === 'webhook_trigger'
+    );
+
+    if (!startNode) {
+      toast({
+        variant: 'destructive',
+        title: 'Cannot save workflow',
+        description: 'A workflow must have a trigger node (Manual or Webhook).',
+      });
+      return;
+    }
+
+    const nodesRequiringCredentials = ['telegram', 'llm', 'langgraph'];
+    for (const node of nodes) {
+      if (nodesRequiringCredentials.includes(node.data.nodeType)) {
+        if (!node.data.inputs?.credentialId) {
+          toast({
+            variant: 'destructive',
+            title: 'Incomplete Configuration',
+            description: `The node "${node.data.label}" requires a credential to be selected.`,
+          });
+          return;
+        }
+      }
+    }
+
     setIsSaving(true);
     try {
+      const nodesForApi = nodes.map(node => ({
+        ...node,
+        type: node.data.nodeType,
+      }));
+
       const workflowContent = {
-        nodes,
+        startNodeId: startNode.id,
+        nodes: nodesForApi,
         edges,
       };
-      
+
       await workflowsApi.update(id, {
-        content: workflowContent,
+        name: workflow?.name,
+        json_content: workflowContent,
       });
-      
+
       toast({
         title: 'Workflow saved!',
         description: 'Your workflow has been saved successfully.',
       });
     } catch (error: any) {
+      // --- START: THIS IS THE KEY FIX FOR THE UI CRASH ---
+      let errorMessage = 'Something went wrong.';
+      if (error.response?.data?.detail && Array.isArray(error.response.data.detail)) {
+        // Handle FastAPI's detailed validation errors
+        errorMessage = `${error.response.data.detail[0].msg} (in ${error.response.data.detail[0].loc.join(' -> ')})`;
+      } else if (error.response?.data?.detail) {
+        // Handle simple string errors
+        errorMessage = error.response.data.detail;
+      }
+
       toast({
         variant: 'destructive',
         title: 'Failed to save workflow',
-        description: error.response?.data?.detail || 'Something went wrong.',
+        description: errorMessage, // Now this is always a safe string
       });
+      // --- END: KEY FIX ---
     } finally {
       setIsSaving(false);
     }
   };
-
   const handleExecute = async () => {
     if (!id) return;
-    
+
     setIsExecuting(true);
     try {
       await workflowsApi.execute(id);
-      
+
       toast({
         title: 'Workflow executed!',
         description: 'Your workflow has been started. Check the runs page for status.',
@@ -144,7 +217,7 @@ export default function WorkflowEditor() {
         inputs: getDefaultInputs(nodeType),
       },
     };
-    
+
     setNodes((nds) => [...nds, newNode]);
   };
 
@@ -162,19 +235,28 @@ export default function WorkflowEditor() {
   const getDefaultInputs = (nodeType: string) => {
     const defaults: Record<string, any> = {
       telegram: {
+        type: 'telegram', // <-- ADD THIS
         credentialId: '',
         chat_id: '',
         message_text: '',
       },
       llm: {
+        type: 'llm', // <-- ADD THIS
         credentialId: '',
         model_name: 'gemini-1.5-flash',
         prompt: '',
       },
       langgraph: {
+        type: 'langgraph', // <-- ADD THIS
         credentialId: '',
         model_name: 'gemini-1.5-flash',
         prompt: '',
+      },
+      manual_trigger: { // <-- ADD THIS
+        type: 'manual_trigger',
+      },
+      webhook_trigger: { // <-- ADD THIS
+        type: 'webhook_trigger',
       },
     };
     return defaults[nodeType] || {};
@@ -225,11 +307,11 @@ export default function WorkflowEditor() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
-      
+
       <div className="flex-1 flex">
         {/* Nodes Sidebar */}
         <WorkflowNodesSidebar onAddNode={handleAddNode} />
-        
+
         {/* Main Editor */}
         <div className="flex-1 relative">
           {/* Header */}
@@ -251,7 +333,7 @@ export default function WorkflowEditor() {
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <Button
                   variant="outline"
@@ -292,7 +374,7 @@ export default function WorkflowEditor() {
               </div>
             </div>
           </div>
-          
+
           {/* React Flow Canvas */}
           <div className="h-full pt-16">
             <ReactFlow
@@ -312,13 +394,14 @@ export default function WorkflowEditor() {
             </ReactFlow>
           </div>
         </div>
-        
+
         {/* Node Configuration Panel */}
         {selectedNode && (
           <NodeConfigPanel
             node={selectedNode}
             onUpdateNode={updateNodeData}
             onClose={() => setSelectedNode(null)}
+            onDeleteNode={handleDeleteNode} // <-- PASS THE FUNCTION HERE
           />
         )}
       </div>

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { useAuthStore } from './auth-store';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -87,10 +87,21 @@ export interface WorkflowRun {
 
 // API functions
 export const authApi = {
-  login: (data: LoginRequest) => api.post<LoginResponse>('/auth/login', data),
+  login: (data: LoginRequest) => {
+    // Transform the JSON object into URL-encoded form data
+    const formData = new URLSearchParams();
+    formData.append('username', data.username);
+    formData.append('password', data.password);
+
+    // Send the request with the correct Content-Type header
+    return api.post<LoginResponse>('/auth/login', formData, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+  },
   register: (data: UserCreate) => api.post('/auth/register', data),
 };
-
 export const credentialsApi = {
   list: () => api.get<Credential[]>('/credentials/'),
   create: (data: CredentialCreate) => api.post<Credential>('/credentials/', data),
